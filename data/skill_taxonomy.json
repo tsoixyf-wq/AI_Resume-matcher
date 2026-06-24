@@ -1,0 +1,212 @@
+{
+  "_description": "技能分类体系 - 用于技能名称标准化和分类",
+  "categories": {
+    "programming_languages": {
+      "display": "编程语言",
+      "skills": {
+        "Python": ["python", "python3", "py"],
+        "Java": ["java", "j2ee", "java se"],
+        "JavaScript": ["javascript", "js", "es6", "node.js"],
+        "TypeScript": ["typescript", "ts"],
+        "Go": ["go", "golang"],
+        "Rust": ["rust"],
+        "C++": ["c++", "cpp", "c plus plus"],
+        "C": ["c语言"],
+        "C#": ["c#", "csharp"],
+        "PHP": ["php"],
+        "Ruby": ["ruby"],
+        "Swift": ["swift"],
+        "Kotlin": ["kotlin"],
+        "Scala": ["scala"],
+        "R": ["r语言"],
+        "Dart": ["dart"],
+        "MATLAB": ["matlab"],
+        "SQL": ["sql"],
+        "HTML": ["html", "html5"],
+        "CSS": ["css", "css3"],
+        "Shell": ["shell", "bash", "zsh"]
+      }
+    },
+    "frameworks": {
+      "display": "框架与库",
+      "skills": {
+        "React": ["react", "react.js", "reactjs"],
+        "Vue": ["vue", "vue.js", "vuejs", "vue3"],
+        "Angular": ["angular", "angularjs"],
+        "Svelte": ["svelte"],
+        "Next.js": ["next.js", "nextjs", "next"],
+        "Nuxt": ["nuxt", "nuxt.js", "nuxtjs"],
+        "Django": ["django", "drf"],
+        "Flask": ["flask"],
+        "FastAPI": ["fastapi"],
+        "Spring Boot": ["spring boot", "springboot", "spring"],
+        "Express": ["express", "express.js"],
+        "NestJS": ["nestjs", "nest"],
+        "Gin": ["gin"],
+        "PyTorch": ["pytorch", "torch"],
+        "TensorFlow": ["tensorflow", "tf"],
+        "Keras": ["keras"],
+        "LangChain": ["langchain"],
+        "LangGraph": ["langgraph"],
+        "LlamaIndex": ["llamaindex", "llama index"],
+        "Transformers": ["transformers", "huggingface"],
+        "Pandas": ["pandas"],
+        "NumPy": ["numpy", "np"],
+        "Scikit-learn": ["scikit-learn", "sklearn"],
+        "OpenCV": ["opencv", "cv2"],
+        "jQuery": ["jquery"],
+        "Bootstrap": ["bootstrap"],
+        "Tailwind CSS": ["tailwind", "tailwindcss"],
+        "Ant Design": ["antd", "ant design"],
+        "Electron": ["electron"],
+        "Redux": ["redux"],
+        "GraphQL": ["graphql"],
+        "gRPC": ["grpc"],
+        "WebSocket": ["websocket", "ws"]
+      }
+    },
+    "databases": {
+      "display": "数据库",
+      "skills": {
+        "MySQL": ["mysql"],
+        "PostgreSQL": ["postgresql", "postgres", "pg"],
+        "MongoDB": ["mongodb", "mongo"],
+        "Redis": ["redis"],
+        "Elasticsearch": ["elasticsearch", "es"],
+        "SQLite": ["sqlite"],
+        "Oracle": ["oracle"],
+        "SQL Server": ["sql server", "sqlserver", "mssql"],
+        "Cassandra": ["cassandra"],
+        "Neo4j": ["neo4j"],
+        "ClickHouse": ["clickhouse"],
+        "Milvus": ["milvus"],
+        "ChromaDB": ["chromadb", "chroma"],
+        "Pinecone": ["pinecone"],
+        "TiDB": ["tidb"],
+        "DynamoDB": ["dynamodb"]
+      }
+    },
+    "cloud_devops": {
+      "display": "云平台与DevOps",
+      "skills": {
+        "Docker": ["docker", "docker compose"],
+        "Kubernetes": ["kubernetes", "k8s"],
+        "AWS": ["aws", "amazon web services"],
+        "Azure": ["azure"],
+        "GCP": ["gcp", "google cloud"],
+        "阿里云": ["阿里云", "aliyun", "alibaba cloud"],
+        "腾讯云": ["腾讯云", "tencent cloud"],
+        "Linux": ["linux", "ubuntu", "centos"],
+        "Git": ["git"],
+        "Nginx": ["nginx"],
+        "Jenkins": ["jenkins"],
+        "GitHub Actions": ["github actions", "github action"],
+        "GitLab CI": ["gitlab ci", "gitlab-ci"],
+        "CI/CD": ["ci/cd", "cicd", "持续集成", "持续部署"],
+        "Terraform": ["terraform", "iac"],
+        "Ansible": ["ansible"],
+        "Kafka": ["kafka"],
+        "RabbitMQ": ["rabbitmq"],
+        "Prometheus": ["prometheus"],
+        "Grafana": ["grafana"],
+        "ELK": ["elk", "elastic stack"]
+      }
+    },
+    "ai_ml": {
+      "display": "AI/机器学习",
+      "skills": {
+        "深度学习": ["深度学习", "deep learning"],
+        "机器学习": ["机器学习", "machine learning", "ml"],
+        "自然语言处理": ["自然语言处理", "nlp", "nlu"],
+        "计算机视觉": ["计算机视觉", "cv", "computer vision"],
+        "大语言模型": ["大语言模型", "llm", "large language model", "大模型"],
+        "RAG": ["rag", "检索增强生成"],
+        "AI Agent": ["ai agent", "智能体", "agent开发"],
+        "Prompt工程": ["prompt engineering", "prompt工程"],
+        "模型微调": ["模型微调", "fine-tuning", "finetune", "lora"],
+        "模型部署": ["模型部署", "模型推理", "triton", "vllm"],
+        "数据挖掘": ["数据挖掘", "data mining"],
+        "推荐系统": ["推荐系统", "recommendation system"],
+        "A/B测试": ["a/b测试", "ab testing"],
+        "强化学习": ["强化学习", "reinforcement learning", "rl"],
+        "GAN": ["gan", "生成对抗网络"],
+        "知识图谱": ["知识图谱", "knowledge graph"],
+        "XGBoost": ["xgboost"],
+        "LightGBM": ["lightgbm"],
+        "CatBoost": ["catboost"],
+        "MLflow": ["mlflow"],
+        "Weights & Biases": ["wandb", "weights & biases"]
+      }
+    },
+    "mobile": {
+      "display": "移动开发",
+      "skills": {
+        "Flutter": ["flutter"],
+        "React Native": ["react native", "reactnative"],
+        "微信小程序": ["微信小程序", "小程序", "wechat mini program"],
+        "SwiftUI": ["swiftui"],
+        "Uniapp": ["uniapp", "uni-app"],
+        "Android": ["android", "安卓"],
+        "iOS": ["ios"],
+        "Taro": ["taro"]
+      }
+    },
+    "embedded_iot": {
+      "display": "嵌入式/IoT",
+      "skills": {
+        "嵌入式开发": ["嵌入式", "嵌入式开发", "embedded"],
+        "ARM": ["arm"],
+        "FPGA": ["fpga"],
+        "RTOS": ["rtos", "freertos", "实时操作系统"],
+        "MQTT": ["mqtt"],
+        "单片机": ["单片机", "mcu", "stm32"],
+        "物联网": ["物联网", "iot", "internet of things"],
+        "传感器": ["传感器", "sensor"]
+      }
+    },
+    "data_engineering": {
+      "display": "数据工程",
+      "skills": {
+        "Spark": ["spark", "apache spark"],
+        "Flink": ["flink", "apache flink"],
+        "Airflow": ["airflow", "apache airflow"],
+        "dbt": ["dbt"],
+        "Snowflake": ["snowflake"],
+        "ETL": ["etl"],
+        "Hadoop": ["hadoop"],
+        "Hive": ["hive"],
+        "数据仓库": ["数据仓库", "数仓", "data warehouse"],
+        "数据湖": ["数据湖", "data lake", "delta lake", "iceberg"],
+        "数据血缘": ["数据血缘", "data lineage"]
+      }
+    },
+    "academic": {
+      "display": "学术研究",
+      "skills": {
+        "LaTeX": ["latex"],
+        "论文发表": ["论文", "paper", "发表"],
+        "实验设计": ["实验设计", "experimental design"],
+        "文献综述": ["文献综述", "literature review"],
+        "统计分析": ["统计分析", "statistical analysis"],
+        "SPSS": ["spss"],
+        "Stata": ["stata"],
+        "数据可视化": ["数据可视化", "data visualization"],
+        "学术写作": ["学术写作", "academic writing"]
+      }
+    },
+    "soft_skills": {
+      "display": "软技能",
+      "skills": {
+        "团队管理": ["团队管理", "team management"],
+        "项目管理": ["项目管理", "project management"],
+        "技术方案设计": ["技术方案", "系统设计", "架构设计"],
+        "跨部门协作": ["跨部门", "跨团队", "沟通协调"],
+        "技术分享": ["技术分享", "技术博客"],
+        "开源贡献": ["开源", "open source"],
+        "敏捷开发": ["敏捷", "agile", "scrum"],
+        "需求分析": ["需求分析", "需求调研"],
+        "技术招聘": ["技术招聘", "面试"]
+      }
+    }
+  }
+}

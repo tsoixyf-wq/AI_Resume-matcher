@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Environment — NEVER copy to image
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# Tests
+tests/
+htmlcov/
+.coverage
+coverage.xml
+
+# Docs
+*.md
+!README.md
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temp
+*.log
+logs/
+tmp/

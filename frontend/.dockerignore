@@ -1,0 +1,44 @@
+# Dependencies
+node_modules/
+.npm/
+
+# Build output
+.next/
+out/
+dist/
+
+# Git
+.git/
+.gitignore
+
+# Environment — NEVER copy to image
+.env
+.env.*
+!.env.example
+!.env.local.example
+
+# IDE
+.vscode/
+.idea/
+
+# Docs
+*.md
+!README.md
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tests
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+
+# Misc
+*.log
+coverage/

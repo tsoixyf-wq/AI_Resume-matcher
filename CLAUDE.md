@@ -1,0 +1,247 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+---
+
+## 项目概述
+
+**Resume Matcher** — AI 驱动的简历解析与岗位匹配系统，帮助 HR 从海量简历中快速筛选匹配岗位要求的候选人。
+
+- **简历解析**: PDF/DOCX/TXT → NER + LLM 三级策略 → 结构化数据
+- **匹配流水线**: 规则过滤 → TF-IDF → BGE 语义 → LLM 深度推理（4 级渐进）
+- **Agent 编排**: LangGraph 状态图，4-Agent 协同（parse → analyze → match → explain）
+- **技术栈**: FastAPI (async) + LangGraph + spaCy/GLiNER + ChromaDB + PostgreSQL 16 (pgvector) + Redis/Celery + Next.js 14 + Ant Design + ECharts
+
+---
+
+## 常用命令
+
+### 后端
+
+```bash
+cd backend
+
+# 安装依赖（含 dev）
+pip install -e ".[dev]"
+python -m spacy download zh_core_web_sm
+
+# 启动开发服务器
+uvicorn app.main:app --reload --port 8000
+
+# 运行所有测试
+pytest
+
+# 运行单个测试
+pytest tests/test_parser.py::TestNERExtractor::test_extract_email -v
+
+# 覆盖率
+pytest --cov=app --cov-report=html
+
+# Lint & 格式化
+ruff check .
+ruff format .
+
+# 类型检查
+mypy app/
+
+# 数据库迁移
+alembic revision --autogenerate -m "描述"
+alembic upgrade head
+
+# Celery Worker
+celery -A app.tasks.celery_app worker --loglevel=info --concurrency=2
+```
+
+### 前端
+
+```bash
+cd frontend
+
+npm install
+npm run dev        # 开发服务器 http://localhost:3000
+npm run build      # 生产构建
+npm run lint       # ESLint
+```
+
+### Docker
+
+```bash
+# 启动基础设施（本地开发时只启动服务，不启动 backend/frontend 容器）
+docker-compose up -d postgres chromadb redis minio
+
+# 全栈一键启动
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f backend
+
+# 数据库迁移（Docker 环境）
+docker-compose exec backend alembic upgrade head
+```
+
+---
+
+## 架构关键点
+
+### 匹配流水线权重
+
+匹配 API 根据是否启用 LLM 使用不同的权重聚合：
+
+| Stage | 启用 LLM | 未启用 LLM |
+|-------|----------|------------|
+| Rule | 0.10 | 0.20 |
+| TF-IDF | 0.20 | 0.35 |
+| Semantic (BGE) | 0.35 | 0.45 |
+| LLM | 0.35 | — |
+
+`enable_llm` 参数控制 Stage 4。批量匹配（`/analyze/batch`）默认 `enable_llm=false` 以节约成本。
+
+### MatchingState — Agent 管线的核心契约
+
+[backend/app/services/agents/graph.py](backend/app/services/agents/graph.py) 中的 `MatchingState` TypedDict 是所有 Agent 共享的状态。修改 Agent 行为时必须理解这个结构：
+
+- 输入: `resume_text`, `jd_text`
+- 中间结果: `resume_parsed` (ParsedResumeData), `jd_parsed` (ParsedJDData), `rule_result`, `tfidf_result`, `semantic_result`, `llm_result`
+- 最终输出: `overall_score`, `dimension_scores`, `matched_skills`, `missing_skills`, `reasoning`, `suggestions`
+- 流控: `error` (非空时触发错误处理), `messages` (Annotated list with add_messages reducer)
+
+### LLM 调用入口
+
+所有 LLM 调用统一通过 [backend/app/utils/llm_client.py](backend/app/utils/llm_client.py) 的 `LLMClient` 类。它封装了一个 `AsyncOpenAI` 客户端——任何 OpenAI-compatible API 都可直接使用。关键方法：
+
+- `chat()` — 普通文本补全
+- `chat_with_json_output()` — 给定 Pydantic schema，返回解析后的 dict
+- `chat_stream()` — SSE 流式输出
+
+切换 LLM Provider 只需修改 `.env` 中的 `LLM_PROVIDER`、`LLM_MODEL`、`LLM_BASE_URL`、`LLM_API_KEY`，无需改代码。
+
+### 数据库
+
+- PostgreSQL 16 + **pgvector** 扩展（docker-compose 使用 `pgvector/pgvector:pg16` 镜像）
+- SQLAlchemy 2.0 async + asyncpg
+- 所有表使用 UUID 主键
+- `Base.metadata.create_all` 在 FastAPI `lifespan` 中自动建表（开发便利，生产应使用 alembic）
+- `get_db` 依赖注入：成功自动 commit，异常自动 rollback
+
+### 简历解析三级策略
+
+1. **正则** ([ner_extractor.py](backend/app/services/parser/ner_extractor.py)): 毫秒级提取邮箱/电话/URL
+2. **GLiNER + spaCy**: 零样本实体识别 + 技能词汇匹配
+3. **LLM** ([llm_extractor.py](backend/app/services/parser/llm_extractor.py)): 深度语义理解复杂字段
+
+NER 和 LLM 结果会合并——NER 提取的高置信度字段（email/phone）优先覆盖 LLM 结果，技能做并集去重。
+
+### 前端状态管理
+
+使用 **Zustand** 进行状态管理，**echarts-for-react** 封装 ECharts 图表。`components/` 和 `hooks/` 目录当前为占位（仅有 `.gitkeep`），组件和 hooks 待实现。
+
+---
+
+## 环境配置注意事项
+
+### 本地开发 vs Docker
+
+`.env.example` 中的 host 配置面向 Docker Compose（服务名如 `postgres`、`chromadb`、`redis`），本地开发时需要改为 `localhost`：
+
+```bash
+# 本地开发时覆盖（config.py 的默认值已是 localhost，可不设）
+POSTGRES_HOST=localhost
+CHROMA_HOST=localhost
+REDIS_URL=redis://localhost:6379/0
+MINIO_ENDPOINT=localhost:9000
+```
+
+### 前端环境变量
+
+前端需要知道后端 API 地址。在 `frontend/` 目录创建 `.env.local`：
+
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
+```
+
+---
+
+## 项目结构
+
+```
+resume-matcher/
+├── backend/
+│   ├── app/
+│   │   ├── api/              # REST API 路由
+│   │   │   ├── resumes.py    # 简历上传/管理
+│   │   │   ├── jobs.py       # JD 管理
+│   │   │   ├── matching.py   # 匹配分析（核心，含权重聚合逻辑）
+│   │   │   └── reports.py    # 报告/仪表盘
+│   │   ├── core/             # 配置(Settings)、数据库(engine/session/Base)、依赖注入
+│   │   ├── models/           # SQLAlchemy ORM (Resume, JobDescription, MatchResult)
+│   │   ├── schemas/          # Pydantic 校验 (ParsedResumeData, DimensionScores 等)
+│   │   ├── services/
+│   │   │   ├── parser/       # 简历解析引擎 (加载→NER→LLM→标准化)
+│   │   │   ├── matcher/      # 4 级匹配流水线 (rule→tfidf→semantic→llm)
+│   │   │   ├── agents/       # LangGraph Agent (graph.py 编排 4 Agent)
+│   │   │   └── embedding/    # ChromaDB 向量存储
+│   │   ├── tasks/            # Celery 异步任务
+│   │   └── utils/            # LLMClient(多模型统一调用), file_utils
+│   ├── tests/
+│   ├── alembic/              # 数据库迁移
+│   ├── pyproject.toml        # 项目配置 + ruff/pytest 设置
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── app/              # Next.js App Router 页面
+│   │   ├── components/       # 可复用组件 (占位)
+│   │   ├── lib/              # api.ts (Axios), types.ts (TS 类型)
+│   │   └── hooks/            # 自定义 hooks (占位)
+│   └── package.json
+├── data/                     # 样本简历/JD + 技能分类体系
+├── docker-compose.yml        # postgres(pgvector) + chromadb + redis + minio + backend + celery + frontend
+└── .env.example
+```
+
+---
+
+## 添加新功能的指南
+
+### 添加新的匹配维度
+
+1. `app/services/matcher/llm_matcher.py` — LLM prompt 中添加分析维度
+2. `app/schemas/matching.py` — `DimensionScores` 添加新字段
+3. `app/services/agents/match_agent.py` — 聚合逻辑加入新维度
+4. `frontend/src/lib/types.ts` — 同步 TS 类型
+5. 前端匹配详情页雷达图添加新的 indicator
+
+### 添加新的简历文件格式
+
+在 `app/services/parser/document_loader.py` 中添加 `_load_xxx()` 静态方法，在 `load()` 的 `loaders` 字典中注册扩展名。
+
+### 添加新的 NER 实体类型
+
+1. `app/services/parser/ner_extractor.py` 的 `extract()` 中添加提取逻辑
+2. `app/schemas/resume.py` 的 `ParsedResumeData` 添加字段
+3. ORM 使用 JSONB，Schema 变更后数据库自动适配
+
+---
+
+## 关键设计决策
+
+### 为什么用多级匹配而非直接 LLM？
+
+1. **成本**: LLM 调用贵，大批量时先用规则+向量过滤
+2. **稳定性**: LLM 有随机性，向量匹配结果可复现
+3. **效率**: 规则/向量毫秒级，LLM 秒级
+4. **可解释性**: 每阶段独立结果，便于调试
+
+### 为什么用 LangGraph 而非 LangChain？
+
+LangGraph 状态图模型更适合多 Agent 协作——每个 Agent 是独立节点，通过 `MatchingState` 共享状态，天然支持条件分支和错误处理。
+
+---
+
+## 项目亮点
+
+1. **Multi-Agent 架构**: LangGraph 编排 4 个 AI Agent 协同完成简历解析→JD分析→智能匹配→可解释报告
+2. **多级渐进匹配**: 规则过滤→TF-IDF→BGE 语义→LLM 深度推理，兼顾效率与精度
+3. **可解释 AI**: LLM 逐条生成匹配理由，可视化展示技能差距与匹配依据
+4. **生产级工程**: FastAPI 异步架构 + Docker 容器化 + Celery 异步任务 + CI/CD 流水线
+5. **中文深度优化**: BGE 中文语义模型 + GLiNER 零样本 NER + 中文技能分类体系

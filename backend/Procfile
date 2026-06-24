@@ -1,0 +1,11 @@
+# Railway / Heroku Procfile
+# Each line = <process-type>: <command>
+
+# Web server — Railway auto-assigns $PORT, Heroku also uses $PORT
+web: uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers 4
+
+# Celery background worker (scale separately on Railway)
+worker: celery -A app.tasks.celery_app worker --loglevel=warning --concurrency=2
+
+# Release phase — auto-run database migrations (Railway)
+# release: alembic upgrade head

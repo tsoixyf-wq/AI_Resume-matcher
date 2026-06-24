@@ -1,0 +1,71 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# Deploy: push to connected Git repo, Render auto-detects this file.
+
+services:
+  - type: web
+    name: resume-matcher-api
+    runtime: python
+    region: singapore  # Closest to China; change to oregon for US
+    plan: standard  # starter / standard / pro
+    healthCheckPath: /api/v1/health
+    buildCommand: |
+      pip install --no-cache-dir -r requirements.txt
+      python -m spacy download zh_core_web_sm
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 4
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: resume-matcher-db
+          property: connectionString
+      - key: POSTGRES_HOST
+        sync: false
+      - key: CHROMA_HOST
+        sync: false
+        value: ${CHROMA_HOST}
+      - key: REDIS_URL
+        sync: false
+        value: ${REDIS_URL}
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        sync: false
+        value: deepseek
+      - key: LLM_MODEL
+        sync: false
+        value: deepseek-chat
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "false"
+      - key: CORS_ORIGINS
+        sync: false
+        value: ${CORS_ORIGINS}
+      - key: PYTHON_VERSION
+        value: "3.11"
+
+  - type: worker
+    name: resume-matcher-celery
+    runtime: python
+    region: singapore
+    plan: standard
+    buildCommand: pip install --no-cache-dir -r requirements.txt
+    startCommand: celery -A app.tasks.celery_app worker --loglevel=warning --concurrency=2
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: resume-matcher-db
+          property: connectionString
+      - key: REDIS_URL
+        sync: false
+        value: ${REDIS_URL}
+      - key: LLM_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.11"
+
+databases:
+  - name: resume-matcher-db
+    databaseName: resume_matcher
+    plan: starter  # starter / standard / pro
+    postgresMajorVersion: 16
+    ipAllowList: []  # Internal access only; add IPs for external tools
