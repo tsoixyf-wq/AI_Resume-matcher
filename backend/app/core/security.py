@@ -13,9 +13,8 @@ When API_KEY is set, requests MUST include the X-API-Key header.
 """
 
 import logging
-from typing import Optional
 
-from fastapi import Depends, HTTPException, Security
+from fastapi import HTTPException, Security
 from fastapi.security import APIKeyHeader
 from starlette.status import HTTP_403_FORBIDDEN
 
@@ -27,7 +26,7 @@ _api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
 def require_api_key(
-    api_key_header: Optional[str] = Security(_api_key_header),
+    api_key_header: str | None = Security(_api_key_header),
 ) -> str:
     """FastAPI dependency: validate X-API-Key header.
 

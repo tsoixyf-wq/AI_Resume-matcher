@@ -8,7 +8,6 @@ import asyncio
 import logging
 import os
 from io import BytesIO
-from typing import Optional
 
 from minio import Minio
 from minio.error import S3Error
@@ -72,7 +71,12 @@ class MinIOStorage:
         await asyncio.to_thread(self._upload_sync, local_path, object_name)
         return object_name
 
-    async def upload_bytes(self, data: bytes, object_name: str, content_type: str = "application/octet-stream") -> str:
+    async def upload_bytes(
+        self,
+        data: bytes,
+        object_name: str,
+        content_type: str = "application/octet-stream",
+    ) -> str:
         """Upload in-memory bytes to MinIO."""
         if not self._enabled:
             logger.debug("MinIO not configured — bytes not persisted")
@@ -136,7 +140,7 @@ class MinIOStorage:
             logger.info("Created MinIO bucket: %s", self._bucket)
 
     def _upload_sync(self, local_path: str, object_name: str) -> None:
-        result = self._client.fput_object(
+        self._client.fput_object(
             self._bucket, object_name, local_path,
         )
         logger.debug("Uploaded %s → %s/%s", local_path, self._bucket, object_name)
@@ -187,7 +191,7 @@ def _minio_configured(settings) -> bool:
 # Module-level singleton
 # ------------------------------------------------------------------
 
-_storage: Optional[MinIOStorage] = None
+_storage: MinIOStorage | None = None
 
 
 def get_storage() -> MinIOStorage:

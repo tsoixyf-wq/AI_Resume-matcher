@@ -2,18 +2,14 @@
 
 import structlog
 
+from app.schemas.resume import (
+    Skill,
+)
 from app.services.agents.state import MatchingState
 from app.services.parser.llm_extractor import LLMExtractor
 from app.services.parser.ner_extractor import NERExtractor
 from app.services.parser.resume_classifier import classify_resume
 from app.services.parser.skill_normalizer import SkillNormalizer
-from app.schemas.resume import (
-    BasicInfo,
-    Education,
-    ParsedResumeData,
-    Skill,
-    WorkExperience,
-)
 
 logger = structlog.get_logger(__name__)
 

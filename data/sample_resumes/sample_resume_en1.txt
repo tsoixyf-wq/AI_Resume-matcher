@@ -1,0 +1,65 @@
+John Smith
+
+Basic Information
+------
+Email: john.smith@example.com
+Phone: +1 (415) 555-0192
+Location: San Francisco, CA
+Years of Experience: 6 years
+
+Education
+------
+Stanford University | M.S. Computer Science | 2017.09 - 2019.06
+UC Berkeley | B.S. Electrical Engineering & Computer Science | 2013.09 - 2017.06 | GPA: 3.7/4.0
+
+Professional Skills
+------
+- Python (Expert): FastAPI, Django, Flask, Celery
+- Go (Proficient): Gin, gRPC, protocol buffers
+- JavaScript/TypeScript (Proficient): React, Next.js, Node.js
+- Databases: PostgreSQL, MySQL, MongoDB, Redis, Elasticsearch
+- Cloud & DevOps: AWS (ECS, RDS, SQS, Lambda), Docker, Kubernetes, Terraform
+- AI/ML: PyTorch, LangChain, RAG, LLM application development, vector databases (ChromaDB, Pinecone)
+- Other: Git, Linux, Nginx, CI/CD (GitHub Actions, Jenkins)
+
+Work Experience
+------
+Google | Senior Software Engineer | 2021.03 - Present
+- Tech lead for internal developer platform serving 5000+ engineers
+- Designed and implemented a high-throughput API gateway in Go handling 10M+ requests/day
+- Built an AI-powered code review assistant using LLMs and RAG, reducing review time by 40%
+- Led migration from monolithic architecture to microservices using Kubernetes and gRPC
+
+Stripe | Software Engineer | 2019.07 - 2021.02
+- Developed core payment processing APIs in Python and Go
+- Optimized database query performance, reducing p99 latency by 55%
+- Implemented real-time fraud detection pipeline processing 1M+ transactions/day
+- Built internal observability tools using Prometheus and Grafana
+
+Meta | Software Engineering Intern | 2018.06 - 2018.09
+- Built A/B testing infrastructure components used by multiple product teams
+- Implemented data pipeline improvements reducing ETL job runtime by 30%
+
+Projects
+------
+AI Resume Analyzer | Open Source | github.com/johnsmith/resume-ai
+- Full-stack application for AI-powered resume analysis and job matching
+- Built with FastAPI + LangGraph + PostgreSQL + ChromaDB
+- Uses BGE embeddings for semantic matching and LLM for explainable scoring
+- Docker-compose for local development, Kubernetes for production
+
+Distributed Task Scheduler | Personal Project | 2020.10 - 2021.01
+- Lightweight distributed task scheduler inspired by Celery
+- Built with Go + Redis + PostgreSQL, supports priority queues and retries
+- 1000+ GitHub stars, used in several production deployments
+
+Certifications
+------
+- AWS Solutions Architect Professional
+- Google Cloud Professional Data Engineer
+- Kubernetes Application Developer (CKAD)
+
+Languages
+------
+- English: Native
+- Mandarin Chinese: Conversational (HSK 4)

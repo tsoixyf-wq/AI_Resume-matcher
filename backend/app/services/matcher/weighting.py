@@ -18,7 +18,7 @@ def compute_weighted_score(
     tfidf_score: float,
     semantic_score: float,
     llm_result: dict | None,
-) -> tuple[float, DimensionScores, dict[str, float]]:
+) -> tuple[float, DimensionScores, str]:
     """
     Compute the weighted overall score from all matching stages.
 
@@ -31,7 +31,10 @@ def compute_weighted_score(
                     missing_skills, reasoning, suggestions.
 
     Returns:
-        (overall_score, dimension_scores, weights_used)
+        (overall_score, dimension_scores, source) where *source* is a string
+        label identifying which weight configuration was applied:
+        - "llm+semantic" when LLM is enabled (regardless of semantic availability)
+        - "semantic_only" when LLM is disabled
     """
     semantic_available = semantic_score > 0
 
@@ -40,6 +43,7 @@ def compute_weighted_score(
             weights = {"rule": 0.10, "tfidf": 0.20, "semantic": 0.35, "llm": 0.35}
         else:
             weights = {"rule": 0.10, "tfidf": 0.20, "semantic": 0.0, "llm": 0.70}
+        source = "llm+semantic"
         overall = (
             weights["rule"] * rule_score
             + weights["tfidf"] * tfidf_score
@@ -61,6 +65,7 @@ def compute_weighted_score(
             weights = {"rule": 0.20, "tfidf": 0.35, "semantic": 0.45}
         else:
             weights = {"rule": 0.25, "tfidf": 0.75, "semantic": 0.0}
+        source = "semantic_only"
         overall = (
             weights["rule"] * rule_score
             + weights["tfidf"] * tfidf_score
@@ -68,4 +73,4 @@ def compute_weighted_score(
         )
         dim_scores = DimensionScores(overall=round(overall, 1))
 
-    return round(overall, 1), dim_scores, weights
+    return round(overall, 1), dim_scores, source

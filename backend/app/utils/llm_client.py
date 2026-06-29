@@ -10,7 +10,7 @@ Usage:
 """
 
 import json
-from typing import Any, Type
+from typing import Any
 
 import structlog
 from openai import AsyncOpenAI
@@ -48,7 +48,7 @@ class LLMClient:
         try:
             response = await self.client.chat.completions.create(
                 model=model or self.settings.LLM_MODEL,
-                messages=messages,
+                messages=messages,  # type: ignore[arg-type]  # openai SDK expects ChatCompletionMessageParam union
                 temperature=temperature or self.settings.LLM_TEMPERATURE,
                 max_tokens=max_tokens or self.settings.LLM_MAX_TOKENS,
             )
@@ -60,7 +60,7 @@ class LLMClient:
     async def chat_with_json_output(
         self,
         prompt: str,
-        output_schema: Type[BaseModel] | None = None,
+        output_schema: type[BaseModel] | None = None,
         system_prompt: str | None = None,
         temperature: float | None = None,
     ) -> dict[str, Any]:
@@ -96,11 +96,11 @@ class LLMClient:
         """Stream chat completion tokens."""
         stream = await self.client.chat.completions.create(
             model=model or self.settings.LLM_MODEL,
-            messages=messages,
+            messages=messages,  # type: ignore[arg-type]  # openai SDK expects ChatCompletionMessageParam union
             temperature=temperature or self.settings.LLM_TEMPERATURE,
             stream=True,
         )
-        async for chunk in stream:
+        async for chunk in stream:  # type: ignore[union-attr]  # stream=True returns AsyncStream but stubs don't narrow
             if chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
 

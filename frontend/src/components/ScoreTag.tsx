@@ -5,6 +5,7 @@ import { Tag } from "antd";
 interface ScoreTagProps {
   score: number;
   showValue?: boolean;
+  isHardPass?: boolean;
 }
 
 const getScoreColor = (score: number): string => {
@@ -22,7 +23,14 @@ const getScoreLabel = (score: number): string => {
   return "较低";
 };
 
-export default function ScoreTag({ score, showValue = true }: ScoreTagProps) {
+export default function ScoreTag({ score, showValue = true, isHardPass = false }: ScoreTagProps) {
+  if (isHardPass) {
+    return (
+      <Tag color="#f5222d" style={{ fontWeight: 600 }}>
+        硬性淘汰
+      </Tag>
+    );
+  }
   const color = getScoreColor(score);
   return (
     <Tag color={color} style={{ fontWeight: 600 }}>

@@ -26,31 +26,33 @@ class MatchRequest(BaseModel):
 
 
 class MatchResponse(BaseModel):
-    id: uuid.UUID
-    resume_id: uuid.UUID
-    job_id: uuid.UUID
+    """Complete match result returned by the matching pipeline."""
+
+    id: uuid.UUID = Field(description="匹配结果唯一标识")
+    resume_id: uuid.UUID = Field(description="简历 ID")
+    job_id: uuid.UUID = Field(description="岗位 ID")
 
     # Scores
-    rule_score: float | None = None
-    tfidf_score: float | None = None
-    semantic_score: float | None = None
-    llm_score: float | None = None
-    overall_score: float
+    rule_score: float | None = Field(default=None, description="规则匹配得分 (0-10)")
+    tfidf_score: float | None = Field(default=None, description="TF-IDF 匹配得分 (0-10)")
+    semantic_score: float | None = Field(default=None, description="语义匹配得分 (0-10)")
+    llm_score: float | None = Field(default=None, description="LLM 推理得分 (0-10)")
+    overall_score: float = Field(description="加权综合得分 (0-10)")
 
     # Details
-    dimension_scores: DimensionScores
-    matched_skills: list[str]
-    missing_skills: list[str]
-    llm_reasoning: str | None = None
-    suggestions: list[str]
+    dimension_scores: DimensionScores = Field(description="7 维度详细评分")
+    matched_skills: list[str] = Field(default_factory=list, description="匹配的技能列表")
+    missing_skills: list[str] = Field(default_factory=list, description="缺失的必备技能")
+    llm_reasoning: str | None = Field(default=None, description="LLM 生成的匹配理由")
+    suggestions: list[str] = Field(default_factory=list, description="ATS 优化建议")
 
     # Hard filters
-    is_hard_pass: bool
-    hard_pass_reasons: list[str]
+    is_hard_pass: bool = Field(default=False, description="是否被硬性条件淘汰")
+    hard_pass_reasons: list[str] = Field(default_factory=list, description="硬性淘汰原因")
 
     # Meta
-    match_duration_ms: int | None = None
-    created_at: datetime
+    match_duration_ms: int | None = Field(default=None, description="匹配耗时（毫秒）")
+    created_at: datetime = Field(description="匹配时间")
 
     model_config = {"from_attributes": True}
 

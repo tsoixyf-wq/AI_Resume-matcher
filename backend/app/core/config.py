@@ -39,6 +39,16 @@ class Settings(BaseSettings):
                     "LLM_API_KEY is required for production. "
                     "Set it in .env or the LLM_PROVIDER environment."
                 )
+            if self.POSTGRES_PASSWORD == "resume123":
+                raise ValueError(
+                    "POSTGRES_PASSWORD must be overridden for production. "
+                    "The default 'resume123' is not allowed."
+                )
+            if self.MINIO_PASSWORD == "minioadmin":
+                raise ValueError(
+                    "MINIO_PASSWORD must be overridden for production. "
+                    "The default 'minioadmin' is not allowed."
+                )
         return self
 
     # --- Database ---
@@ -49,7 +59,7 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
 
     @property
-    def DATABASE_URL(self) -> str:
+    def DATABASE_URL(self) -> str:  # noqa: N802  # matches env-var naming convention
         return (
             f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
@@ -85,6 +95,11 @@ class Settings(BaseSettings):
     # --- NER ---
     ENABLE_GLINER: bool = False   # Enable GLiNER zero-shot NER (needs gliner package)
 
+    # --- Matching ---
+    # Fraction of must-have skills that can be missing before triggering hard pass.
+    # 0.5 = allow up to 50% missing; >50% triggers hard pass.
+    MUST_SKILL_MISSING_THRESHOLD: float = 0.5
+
     # --- File Upload ---
     MAX_UPLOAD_SIZE_MB: int = 10
     ALLOWED_EXTENSIONS: list[str] = ["pdf", "docx", "doc", "txt", "md"]
@@ -94,7 +109,7 @@ class Settings(BaseSettings):
     DATA_DIR: Path = BASE_DIR / "data"
 
 
-@lru_cache()
+@lru_cache
 def get_settings() -> Settings:
     s = Settings()
     # Set HuggingFace mirror for downloading models in China

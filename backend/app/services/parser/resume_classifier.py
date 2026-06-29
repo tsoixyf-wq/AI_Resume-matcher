@@ -5,7 +5,6 @@ candidate or an experienced professional.
 Detection is rule-based (fast, no LLM cost) with LLM fallback for ambiguous cases.
 """
 
-import re
 from datetime import datetime
 
 import structlog
@@ -78,7 +77,10 @@ def classify_resume(
                             )
                             return "campus"
             except (ValueError, IndexError):
-                pass
+                logger.debug(
+                    "Could not parse graduation end_date for classification",
+                    end_date=edu.end_date,
+                )
 
     # Heuristic 3: Keyword density
     campus_count = sum(

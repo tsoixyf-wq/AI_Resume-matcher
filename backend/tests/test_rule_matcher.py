@@ -2,7 +2,12 @@
 
 import pytest
 
-from app.schemas.job import ParsedJDData, SkillRequirement
+from app.schemas.job import (
+    EducationRequirement,
+    ExperienceRequirement,
+    ParsedJDData,
+    SkillRequirement,
+)
 from app.schemas.resume import (
     BasicInfo,
     Certification,
@@ -18,13 +23,21 @@ from app.services.matcher.rule_matcher import RuleMatcher
 @pytest.fixture
 def sample_resume():
     return ParsedResumeData(
-        basic_info=BasicInfo(name="张三", email="zhang@test.com", phone="13800138000"),
+        basic_info=BasicInfo(
+            name="张三", email="zhang@test.com", phone="13800138000", years_of_experience=5,
+        ),
         education=[
-            Education(school="清华大学", degree="硕士", major="计算机科学", start="2020-09", end="2023-06"),
+            Education(
+                school="清华大学", degree="硕士", major="计算机科学",
+                start_date="2020-09", end_date="2023-06",
+            ),
         ],
         work_experience=[
-            WorkExperience(company="阿里云", title="高级工程师", start="2023-07", end="2025-06",
-                           description="负责云原生平台开发"),
+            WorkExperience(
+                company="阿里云", title="高级工程师",
+                start_date="2023-07", end_date="2025-06",
+                description="负责云原生平台开发",
+            ),
         ],
         skills=[
             Skill(name="Python", category="编程语言"),
@@ -50,9 +63,10 @@ def sample_jd():
             SkillRequirement(name="Docker", importance="required"),
             SkillRequirement(name="Java", importance="preferred"),
         ],
-        education_required=[],
-        experience_required=[{"years": 3, "field": "后端开发"}],
-        preferred_fields={"languages": ["英语"], "certs": ["AWS"]},
+        education_required=EducationRequirement(min_degree="本科"),
+        experience_required=ExperienceRequirement(
+            min_years=3, preferred_fields=["后端开发"],
+        ),
         responsibilities=["负责后端服务开发", "参与系统架构设计"],
     )
 
@@ -83,27 +97,31 @@ class TestRuleMatcher:
     async def test_degree_check(self, sample_resume, sample_jd):
         matcher = RuleMatcher()
         result = await matcher.match(sample_resume, sample_jd)
-        assert result["details"]["education"]["score"] > 0
+        assert result["details"]["degree"]["passed"]
+        assert result["details"]["degree"]["actual"] == "硕士"
 
     @pytest.mark.asyncio
     async def test_degree_check_no_education(self, empty_resume, sample_jd):
         matcher = RuleMatcher()
         result = await matcher.match(empty_resume, sample_jd)
-        assert result["details"]["education"]["score"] <= 5.0  # neutral for empty
+        # empty resume lacks education → degree requirement not met → hard pass
+        assert not result["details"]["degree"]["passed"]
+        assert result["is_hard_pass"]
 
     @pytest.mark.asyncio
     async def test_experience_check(self, sample_resume, sample_jd):
         matcher = RuleMatcher()
         result = await matcher.match(sample_resume, sample_jd)
-        assert result["details"]["experience"]["score"] > 0
+        assert result["details"]["experience"]["passed"]
 
     @pytest.mark.asyncio
     async def test_skill_match(self, sample_resume, sample_jd):
         matcher = RuleMatcher()
         result = await matcher.match(sample_resume, sample_jd)
         skills = result["details"]["skills"]
-        assert skills["score"] > 0
-        assert len(skills.get("matched", [])) >= 2  # Python + Docker
+        assert skills["passed"]
+        # Python + Docker are required and both present → no missing
+        assert len(skills["missing"]) == 0
 
     @pytest.mark.asyncio
     async def test_skill_missing_triggers_hard_pass(self):
@@ -147,14 +165,14 @@ class TestRuleMatcher:
         """Campus resume with high GPA gets a bonus."""
         resume = ParsedResumeData(
             education=[
-                Education(school="北大", degree="学士", major="CS", gpa="3.8/4.0"),
+                Education(school="北大", degree="学士", major="CS", gpa=3.8),
             ],
             resume_type="campus",
         )
         jd = ParsedJDData(basic_info={"title": "应届生岗位"})
         matcher = RuleMatcher()
         result = await matcher.match(resume, jd)
-        assert "education" in result["details"]
+        assert "gpa" in result["details"]
 
     @pytest.mark.asyncio
     async def test_campus_internship_check(self):

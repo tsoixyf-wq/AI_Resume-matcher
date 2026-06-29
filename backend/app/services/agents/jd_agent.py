@@ -3,11 +3,7 @@
 import structlog
 
 from app.schemas.job import (
-    EducationRequirement,
-    ExperienceRequirement,
     ParsedJDData,
-    Requirement,
-    SkillRequirement,
 )
 from app.services.agents.state import MatchingState
 from app.services.parser.llm_extractor import LLMExtractor

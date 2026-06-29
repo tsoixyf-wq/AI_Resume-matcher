@@ -3,7 +3,6 @@ Stage 2: TF-IDF + Fuzzy matching.
 Computes keyword coverage and fuzzy skill name matching.
 """
 
-import re
 
 import jieba
 import structlog

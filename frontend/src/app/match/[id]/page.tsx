@@ -152,12 +152,14 @@ export default function MatchDetailPage() {
                 format={() => (
                   <span
                     style={{
-                      fontSize: 36,
+                      fontSize: match?.is_hard_pass ? 18 : 36,
                       fontWeight: 700,
                       color: scoreColor,
                     }}
                   >
-                    {match?.overall_score ?? "-"}
+                    {match?.is_hard_pass
+                      ? "不满足硬性要求"
+                      : (match?.overall_score ?? "-")}
                   </span>
                 )}
                 strokeColor={scoreColor}

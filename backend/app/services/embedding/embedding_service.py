@@ -4,8 +4,11 @@ Provides async-friendly encode + store operations for resumes and JDs,
 plus similarity-based candidate retrieval.
 """
 
+import asyncio
 import logging
-from typing import Optional
+import threading
+import uuid
+from typing import Any
 
 from app.core.config import get_settings
 from app.services.embedding.vector_store import VectorStore
@@ -16,20 +19,27 @@ logger = logging.getLogger(__name__)
 # Lazy model loading
 # ---------------------------------------------------------------------------
 
-_model: Optional[object] = None  # SentenceTransformer instance
+_model: Any | None = None  # SentenceTransformer instance
+_model_lock = threading.Lock()
 
 
-def _get_model() -> object:
-    """Return the singleton SentenceTransformer, loading on first call."""
+def _get_model() -> Any:
+    """Return the singleton SentenceTransformer, loading on first call.
+
+    Thread-safe: concurrent first calls only load the model once.
+    """
     global _model
     if _model is None:
-        from sentence_transformers import SentenceTransformer
-        settings = get_settings()
-        logger.info("Loading embedding model: %s", settings.EMBEDDING_MODEL)
-        _model = SentenceTransformer(
-            settings.EMBEDDING_MODEL,
-            device=settings.EMBEDDING_DEVICE,
-        )
+        with _model_lock:
+            # Double-checked locking — another thread may have loaded while we waited
+            if _model is None:
+                from sentence_transformers import SentenceTransformer
+                settings = get_settings()
+                logger.info("Loading embedding model: %s", settings.EMBEDDING_MODEL)
+                _model = SentenceTransformer(
+                    settings.EMBEDDING_MODEL,
+                    device=settings.EMBEDDING_DEVICE,
+                )
     return _model
 
 
@@ -42,14 +52,13 @@ async def embed_resume(resume_id: str, text: str, metadata: dict | None = None) 
 
     Returns the ChromaDB document ID (same as resume_id).
     """
-    import asyncio
     model = _get_model()
     embedding = await asyncio.to_thread(model.encode, text, show_progress_bar=False)
     embedding_list = embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
 
     store = VectorStore()
     doc_id = store.upsert_resume(
-        resume_id=resume_id,
+        resume_id=resume_id,  # type: ignore[arg-type]  # VectorStore accepts str at runtime
         embedding=embedding_list,
         metadata=metadata or {},
         text=text,
@@ -60,14 +69,13 @@ async def embed_resume(resume_id: str, text: str, metadata: dict | None = None) 
 
 async def embed_jd(jd_id: str, text: str, metadata: dict | None = None) -> str:
     """Encode JD text and store in ChromaDB."""
-    import asyncio
     model = _get_model()
     embedding = await asyncio.to_thread(model.encode, text, show_progress_bar=False)
     embedding_list = embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
 
     store = VectorStore()
     doc_id = store.upsert_jd(
-        jd_id=jd_id,
+        jd_id=jd_id,  # type: ignore[arg-type]  # VectorStore accepts str at runtime
         embedding=embedding_list,
         metadata=metadata or {},
         text=text,
@@ -85,7 +93,6 @@ async def find_similar_resumes(
     Uses the JD's own embedding as the query vector.
     Returns list of {id, distance, metadata}.
     """
-    import asyncio
     store = VectorStore()
 
     # Get the JD embedding from the JD collection
@@ -100,20 +107,18 @@ async def find_similar_resumes(
         logger.warning("Failed to retrieve JD %s embedding", jd_id)
         return []
 
-    results = store.query_similar_resumes(jd_embedding, n_results=top_k)
+    results = store.query_similar_resumes(jd_embedding, n_results=top_k)  # type: ignore[arg-type]
     logger.info("Similarity search for JD %s: %d results", jd_id, len(results))
     return results
 
 
 async def delete_resume_embedding(resume_id: str) -> None:
     """Remove a resume from the vector store."""
-    import uuid
     store = VectorStore()
     store.delete_resume(uuid.UUID(resume_id))
 
 
 async def delete_jd_embedding(jd_id: str) -> None:
     """Remove a JD from the vector store."""
-    import uuid
     store = VectorStore()
     store.delete_jd(uuid.UUID(jd_id))

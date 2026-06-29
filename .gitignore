@@ -39,9 +39,9 @@ next-env.d.ts
 Thumbs.db
 
 # Data
-data/uploads/*
-!data/uploads/.gitkeep
-data/chroma/
+**/data/uploads/*
+!**/data/uploads/.gitkeep
+**/data/chroma/
 
 # Logs
 logs/

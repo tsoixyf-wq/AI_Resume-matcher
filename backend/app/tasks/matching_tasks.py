@@ -7,12 +7,22 @@ LLM calls are wrapped with asyncio.run() inside the sync task body.
 import asyncio
 import logging
 import os
-import time
-from datetime import datetime, timedelta, timezone
+import uuid
+from datetime import UTC, datetime, timedelta
 
+from sqlalchemy import select
+
+from app.core.database import async_session_factory
+from app.models.resume import Resume
+from app.services.parser.document_loader import DocumentLoader
+from app.services.parser.service import ResumeParserService
 from app.tasks.celery_app import celery_app
+from app.utils.storage import get_storage
 
 logger = logging.getLogger(__name__)
+
+# Max concurrent matcher executions in batch matching (CPU/GPU-bound work)
+_BATCH_MATCH_CONCURRENCY = 4
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -39,80 +49,32 @@ def parse_resume_async(self, resume_id: str):
 
 
 async def _do_parse_resume(resume_id: str, task_id: str = "") -> dict:
-    import uuid as _uuid
-
-    from app.core.database import async_session_factory
-    from app.models.resume import Resume
-    from app.schemas.resume import ParsedResumeData
-    from app.services.parser.document_loader import DocumentLoader
-    from app.services.parser.llm_extractor import LLMExtractor
-    from app.services.parser.ner_extractor import NERExtractor
-    from app.services.parser.resume_classifier import classify_resume
-    from app.services.parser.skill_normalizer import SkillNormalizer
-
     async with async_session_factory() as db:
         result = await db.execute(
-            __import__('sqlalchemy').select(Resume).where(Resume.id == _uuid.UUID(resume_id))
+            select(Resume).where(Resume.id == uuid.UUID(resume_id))
         )
         resume = result.scalar_one_or_none()
         if not resume:
             return {"resume_id": resume_id, "status": "not_found"}
 
         try:
-            start = time.time()
             resume.parse_status = "processing"
             await db.flush()
 
             text = await DocumentLoader.load(resume.file_path)
 
-            # Tier 1: NER extraction (always works, no external API)
-            ner = NERExtractor()
-            entities = await ner.extract(text)
+            # Parse via shared service (NER → LLM → merge → normalize → classify)
+            service = ResumeParserService()
+            parse_result = await service.parse(text)
+            parsed = parse_result.parsed
 
-            # Tier 2: LLM deep extraction (may fail if API key invalid)
-            llm_failed = False
-            try:
-                parsed = await LLMExtractor().extract(text)
-            except Exception as llm_err:
-                logger.warning("LLM extraction failed, falling back to NER-only: %s", llm_err)
-                llm_failed = True
-                parsed = ParsedResumeData(
-                    basic_info=BasicInfo(
-                        name=entities.get("name", ""),
-                        email=entities.get("email", ""),
-                        phone=entities.get("phone", ""),
-                    ),
-                    skills=[Skill(name=s, category="") for s in entities.get("skills", [])],
-                )
-
-            # Merge NER high-confidence fields
-            if entities.get("email") and not parsed.basic_info.email:
-                parsed.basic_info.email = entities["email"]
-            if entities.get("phone") and not parsed.basic_info.phone:
-                parsed.basic_info.phone = entities["phone"]
-            if entities.get("name") and not parsed.basic_info.name:
-                parsed.basic_info.name = entities["name"]
-
-            # Normalize skills
-            normalizer = SkillNormalizer()
-            normalized = normalizer.normalize_list(
-                entities.get("skills", []) + [s.name for s in parsed.skills]
-            )
-            from app.schemas.resume import Skill, BasicInfo
-            seen = set()
-            merged = []
-            for s in normalized:
-                if s["name"].lower() not in seen:
-                    seen.add(s["name"].lower())
-                    merged.append(Skill(name=s["name"], category=s.get("category_display")))
-            parsed.skills = merged
-
-            parsed.resume_type = classify_resume(parsed, text)
+            if parse_result.llm_error:
+                resume.parse_error = f"LLM skipped: {parse_result.llm_error}"
 
             resume.parsed_data = parsed.model_dump()
             resume.raw_text = text
             resume.parse_status = "completed"
-            resume.parse_duration_ms = int((time.time() - start) * 1000)
+            resume.parse_duration_ms = parse_result.duration_ms
 
             # Create embedding for similarity search
             try:
@@ -125,7 +87,11 @@ async def _do_parse_resume(resume_id: str, task_id: str = "") -> dict:
             except Exception as emb_err:
                 logger.warning("Embedding failed (non-critical): %s", emb_err)
 
-            logger.info("parse_resume_async completed, resume_id=%s, type=%s", resume_id, parsed.resume_type)
+            logger.info(
+                "parse_resume_async completed, resume_id=%s, type=%s",
+                resume_id,
+                parsed.resume_type,
+            )
 
         except Exception as exc:
             resume.parse_status = "failed"
@@ -169,14 +135,9 @@ async def _do_batch_match(
     enable_llm: bool,
     on_progress=None,
 ) -> dict:
-    import uuid as _uuid
-
-    from sqlalchemy import select as _select
-
-    from app.core.database import async_session_factory
+    # Heavy matcher imports kept lazy to avoid loading ML models at worker startup
     from app.models.job import JobDescription
     from app.models.match_result import MatchResult
-    from app.models.resume import Resume
     from app.schemas.job import ParsedJDData
     from app.schemas.matching import DimensionScores
     from app.schemas.resume import ParsedResumeData
@@ -186,9 +147,53 @@ async def _do_batch_match(
     from app.services.matcher.tfidf_matcher import TFIDFMatcher
     from app.services.matcher.weighting import compute_weighted_score
 
+    # Limit concurrent matcher executions to avoid overwhelming CPU/GPU
+    sem = asyncio.Semaphore(_BATCH_MATCH_CONCURRENCY)
+
+    async def _match_one(resume_data: ParsedResumeData, jd_data: ParsedJDData):
+        """Run matchers for a single resume (no DB access). Returns a dict of match fields."""
+        async with sem:
+            rule = await RuleMatcher().match(resume_data, jd_data)
+            if rule.get("is_hard_pass"):
+                return {
+                    "is_hard_pass": True,
+                    "rule_score": rule["score"],
+                    "hard_pass_reasons": rule.get("hard_pass_reasons", []),
+                }
+
+            tfidf = await TFIDFMatcher().match(resume_data, jd_data)
+            semantic = await SemanticMatcher().match(resume_data, jd_data)
+
+            llm_res = None
+            if enable_llm:
+                llm_res = await LLMMatcher().match(resume_data, jd_data, {
+                    "rule": rule["score"], "tfidf": tfidf["score"], "semantic": semantic["score"],
+                })
+
+            overall, dim_scores, _ = compute_weighted_score(
+                rule_score=rule["score"],
+                tfidf_score=tfidf["score"],
+                semantic_score=semantic["score"],
+                llm_result=llm_res,
+            )
+
+            return {
+                "is_hard_pass": False,
+                "rule_score": rule["score"],
+                "tfidf_score": tfidf["score"],
+                "semantic_score": semantic["score"],
+                "llm_score": llm_res["score"] if llm_res else None,
+                "overall_score": round(overall, 1),
+                "dimension_scores": dim_scores.model_dump(),
+                "matched_skills": llm_res.get("matched_skills", []) if llm_res else [],
+                "missing_skills": llm_res.get("missing_skills", []) if llm_res else [],
+                "llm_reasoning": llm_res.get("reasoning", "") if llm_res else None,
+                "suggestions": llm_res.get("suggestions", []) if llm_res else [],
+            }
+
     async with async_session_factory() as db:
         jd_result = await db.execute(
-            _select(JobDescription).where(JobDescription.id == _uuid.UUID(job_id))
+            select(JobDescription).where(JobDescription.id == uuid.UUID(job_id))
         )
         jd = jd_result.scalar_one_or_none()
         if not jd:
@@ -196,84 +201,96 @@ async def _do_batch_match(
 
         jd_data = ParsedJDData(**jd.parsed_data)
 
-        results: list[dict] = []
-        total = len(resume_ids)
+        # Batch-load all resumes in a single query (avoids N round-trips)
+        resume_rows = await db.execute(
+            select(Resume).where(Resume.id.in_([uuid.UUID(rid) for rid in resume_ids]))
+        )
+        resume_map = {str(r.id): r for r in resume_rows.scalars().all()}
 
+        # Separate completed resumes from skipped ones; preserve input order
+        to_match: list[tuple[str, ParsedResumeData]] = []
+        results: list[dict] = [None] * len(resume_ids)  # type: ignore[list-item]
         for i, rid_str in enumerate(resume_ids):
-            rid = _uuid.UUID(rid_str)
-            res = await db.execute(_select(Resume).where(Resume.id == rid))
-            resume = res.scalar_one_or_none()
-
+            resume = resume_map.get(rid_str)
             if not resume or resume.parse_status != "completed":
-                results.append({"resume_id": rid_str, "status": "skipped"})
-                continue
+                results[i] = {"resume_id": rid_str, "status": "skipped"}
+            else:
+                try:
+                    resume_data = ParsedResumeData(**resume.parsed_data)
+                except Exception:
+                    logger.exception("Batch match: invalid parsed_data for resume %s", rid_str)
+                    results[i] = {"resume_id": rid_str, "status": "failed",
+                                  "error": "invalid parsed_data"}
+                else:
+                    to_match.append((rid_str, resume_data))
 
+        # Run matchers concurrently; collect results as they complete
+        pending: dict[asyncio.Future, str] = {}
+        for rid_str, resume_data in to_match:
+            task = asyncio.create_task(_match_one(resume_data, jd_data))
+            pending[task] = rid_str
+
+        completed_count = len(resume_ids) - len(to_match)  # already-resolved (skipped/failed)
+        # Report initial progress for skipped items
+        if on_progress and completed_count > 0:
+            on_progress(completed_count, len(resume_ids), [r for r in results if r])
+
+        for done in asyncio.as_completed(pending):
+            rid_str = pending[done]
+            idx = resume_ids.index(rid_str)
             try:
-                resume_data = ParsedResumeData(**resume.parsed_data)
-
-                rule = await RuleMatcher().match(resume_data, jd_data)
-                if rule.get("is_hard_pass"):
+                match_data = await done
+                if match_data.get("is_hard_pass"):
                     mr = MatchResult(
-                        resume_id=rid, job_id=_uuid.UUID(job_id),
-                        rule_score=rule["score"], overall_score=0.0,
+                        resume_id=uuid.UUID(rid_str), job_id=uuid.UUID(job_id),
+                        rule_score=match_data["rule_score"], overall_score=0.0,
                         dimension_scores=DimensionScores().model_dump(),
-                        hard_pass_reasons=rule.get("hard_pass_reasons", []),
+                        hard_pass_reasons=match_data.get("hard_pass_reasons", []),
                         is_hard_pass=True,
                     )
                     db.add(mr)
                     await db.flush()
-                    results.append({"resume_id": rid_str, "overall_score": 0.0, "is_hard_pass": True})
-                    continue
-
-                tfidf = await TFIDFMatcher().match(resume_data, jd_data)
-                semantic = await SemanticMatcher().match(resume_data, jd_data)
-
-                llm_res = None
-                if enable_llm:
-                    llm_res = await LLMMatcher().match(resume_data, jd_data, {
-                        "rule": rule["score"], "tfidf": tfidf["score"], "semantic": semantic["score"],
-                    })
-
-                overall, dim_scores, _ = compute_weighted_score(
-                    rule_score=rule["score"],
-                    tfidf_score=tfidf["score"],
-                    semantic_score=semantic["score"],
-                    llm_result=llm_res,
-                )
-
-                mr = MatchResult(
-                    resume_id=rid, job_id=_uuid.UUID(job_id),
-                    rule_score=rule["score"], tfidf_score=tfidf["score"],
-                    semantic_score=semantic["score"],
-                    llm_score=llm_res["score"] if llm_res else None,
-                    overall_score=round(overall, 1),
-                    dimension_scores=dim_scores.model_dump(),
-                    matched_skills=llm_res.get("matched_skills", []) if llm_res else [],
-                    missing_skills=llm_res.get("missing_skills", []) if llm_res else [],
-                    llm_reasoning=llm_res.get("reasoning", "") if llm_res else None,
-                    suggestions=llm_res.get("suggestions", []) if llm_res else [],
-                )
-                db.add(mr)
-                await db.flush()
-
-                results.append({
-                    "resume_id": rid_str,
-                    "overall_score": round(overall, 1),
-                    "match_result_id": str(mr.id),
-                })
-
+                    results[idx] = {"resume_id": rid_str, "overall_score": 0.0,
+                                    "is_hard_pass": True}
+                else:
+                    mr = MatchResult(
+                        resume_id=uuid.UUID(rid_str), job_id=uuid.UUID(job_id),
+                        rule_score=match_data["rule_score"],
+                        tfidf_score=match_data["tfidf_score"],
+                        semantic_score=match_data["semantic_score"],
+                        llm_score=match_data["llm_score"],
+                        overall_score=match_data["overall_score"],
+                        dimension_scores=match_data["dimension_scores"],
+                        matched_skills=match_data["matched_skills"],
+                        missing_skills=match_data["missing_skills"],
+                        llm_reasoning=match_data["llm_reasoning"],
+                        suggestions=match_data["suggestions"],
+                    )
+                    db.add(mr)
+                    await db.flush()
+                    results[idx] = {"resume_id": rid_str,
+                                    "overall_score": match_data["overall_score"],
+                                    "match_result_id": str(mr.id)}
             except Exception as exc:
                 logger.exception("Batch match failed for resume %s", rid_str)
-                results.append({"resume_id": rid_str, "status": "failed", "error": str(exc)[:200]})
+                results[idx] = {"resume_id": rid_str, "status": "failed",
+                                "error": str(exc)[:200]}
 
-            # Report progress
+            completed_count += 1
             if on_progress:
-                on_progress(i + 1, total, results)
+                on_progress(completed_count, len(resume_ids),
+                            [r for r in results if r])
 
         await db.commit()
 
-    return {"completed": len([r for r in results if r.get("overall_score") is not None or r.get("is_hard_pass")]),
-            "total": total, "results": results}
+    return {
+        "completed": len([
+            r for r in results
+            if r and (r.get("overall_score") is not None or r.get("is_hard_pass"))
+        ]),
+        "total": len(resume_ids),
+        "results": results,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -288,22 +305,14 @@ def cleanup_old_files(self, days: int = 30):
 
 
 async def _do_cleanup(days: int) -> dict:
-    from datetime import timezone as _tz
-
-    from sqlalchemy import select as _select
-
-    from app.core.database import async_session_factory
-    from app.models.resume import Resume
-    from app.utils.storage import get_storage
-
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
     deleted_files = 0
     deleted_records = 0
 
     async with async_session_factory() as db:
         # Find old failed / pending records
         result = await db.execute(
-            _select(Resume).where(
+            select(Resume).where(
                 Resume.parse_status.in_(["failed", "pending"]),
                 Resume.created_at < cutoff,
             )
@@ -331,5 +340,9 @@ async def _do_cleanup(days: int) -> dict:
 
         await db.commit()
 
-    logger.info("cleanup_old_files done: %d files, %d records deleted", deleted_files, deleted_records)
+    logger.info(
+        "cleanup_old_files done: %d files, %d records deleted",
+        deleted_files,
+        deleted_records,
+    )
     return {"deleted_files": deleted_files, "deleted_records": deleted_records, "days": days}

@@ -7,10 +7,10 @@ import structlog
 
 from app.schemas.matching import DimensionScores
 from app.services.agents.state import MatchingState
-from app.services.matcher.rule_matcher import RuleMatcher
-from app.services.matcher.tfidf_matcher import TFIDFMatcher
-from app.services.matcher.semantic_matcher import SemanticMatcher
 from app.services.matcher.llm_matcher import LLMMatcher
+from app.services.matcher.rule_matcher import RuleMatcher
+from app.services.matcher.semantic_matcher import SemanticMatcher
+from app.services.matcher.tfidf_matcher import TFIDFMatcher
 from app.services.matcher.weighting import compute_weighted_score
 
 logger = structlog.get_logger(__name__)

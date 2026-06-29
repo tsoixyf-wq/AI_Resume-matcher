@@ -3,6 +3,8 @@ Explanation Agent - synthesizes matching results into a comprehensive,
 human-readable report with visualizable data.
 """
 
+from typing import Any
+
 import structlog
 
 from app.services.agents.state import MatchingState
@@ -17,13 +19,12 @@ async def explain_agent(state: MatchingState) -> MatchingState:
     """
     try:
         # If there's already a hard pass, no explanation needed
-        rule_result = state.get("rule_result", {})
+        rule_result = state.get("rule_result") or {}
         if rule_result.get("is_hard_pass"):
             return state
 
         # Enrich reasoning with structured highlights
-        llm_result = state.get("llm_result", {})
-        tfidf_result = state.get("tfidf_result", {})
+        tfidf_result = state.get("tfidf_result") or {}
 
         # Merge matched skills from all stages
         all_matched = set(state.get("matched_skills", []))
@@ -36,7 +37,7 @@ async def explain_agent(state: MatchingState) -> MatchingState:
         state["matched_skills"] = list(all_matched)
 
         # Generate structured report sections
-        report = {
+        report: dict[str, Any] = {
             "summary": _build_summary(state),
             "dimensions": _build_dimension_detail(state),
             "skill_gap": _build_skill_gap(state),

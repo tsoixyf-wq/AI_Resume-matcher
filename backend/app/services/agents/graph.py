@@ -14,11 +14,11 @@ from copy import deepcopy
 import structlog
 from langgraph.graph import END, StateGraph
 
-from app.services.agents.state import MatchingState
-from app.services.agents.resume_agent import resume_parse_agent
+from app.services.agents.explain_agent import explain_agent
 from app.services.agents.jd_agent import jd_analyze_agent
 from app.services.agents.match_agent import match_agent
-from app.services.agents.explain_agent import explain_agent
+from app.services.agents.resume_agent import resume_parse_agent
+from app.services.agents.state import MatchingState
 
 logger = structlog.get_logger(__name__)
 
@@ -61,9 +61,9 @@ async def parse_all_agent(state: MatchingState) -> MatchingState:
 
     # Merge results back into state
     for key, value in resume_result.items():
-        state[key] = value
+        state[key] = value  # type: ignore[literal-required]  # dynamic key merge into TypedDict
     for key, value in jd_result.items():
-        state[key] = value
+        state[key] = value  # type: ignore[literal-required]  # dynamic key merge into TypedDict
 
     logger.info("Parallel parsing completed")
     return state
@@ -103,7 +103,7 @@ def build_matching_graph() -> StateGraph:
         {"error": "handle_error", "continue": END},
     )
 
-    return workflow.compile()
+    return workflow.compile()  # type: ignore[return-value]  # langgraph compile() returns CompiledStateGraph, not StateGraph
 
 
 def check_error(state: MatchingState) -> str:

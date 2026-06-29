@@ -5,7 +5,6 @@ Maps variant skill names (e.g., "React.js", "ReactJS") to canonical forms.
 
 import json
 import os
-from pathlib import Path
 
 import structlog
 from fuzzywuzzy import fuzz
@@ -133,7 +132,7 @@ class SkillNormalizer:
     def _load_taxonomy(self, path: str | None) -> dict:
         """Load skill taxonomy from file or use default."""
         if path and os.path.exists(path):
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 return json.load(f)
         return DEFAULT_SKILL_TAXONOMY
 

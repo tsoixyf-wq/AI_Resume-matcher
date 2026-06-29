@@ -1,0 +1,66 @@
+Emily Chen
+
+Basic Information
+------
+Email: emily.chen@example.com
+Phone: +1 (650) 555-0187
+Location: New York, NY
+Years of Experience: 4 years
+
+Education
+------
+Columbia University | M.S. Data Science | 2020.09 - 2022.05
+University of Michigan | B.S. Statistics | 2016.09 - 2020.05 | GPA: 3.8/4.0
+
+Professional Skills
+------
+- Python (Expert): Pandas, NumPy, Scikit-learn, PyTorch, XGBoost, Jupyter
+- SQL (Expert): PostgreSQL, BigQuery, Snowflake, complex query optimization
+- R (Proficient): tidyverse, caret, Shiny
+- Machine Learning: Classification, Regression, Clustering, NLP, Time Series
+- Deep Learning: PyTorch, Transformers, BERT, fine-tuning
+- Data Visualization: Matplotlib, Seaborn, Plotly, Tableau, Looker
+- Big Data: Spark, Hive, Airflow, dbt
+- Cloud: AWS (S3, SageMaker, EMR), GCP (BigQuery, Vertex AI)
+- Other: Git, Docker, MLflow, Weights & Biases
+
+Work Experience
+------
+Spotify | Senior Data Scientist | 2023.01 - Present
+- Led development of personalized playlist recommendation system serving 200M+ users
+- Built and deployed deep learning models using PyTorch, improving user engagement by 18%
+- Designed A/B testing framework for ML model evaluation with statistical rigor
+- Mentored 3 junior data scientists on experiment design and ML best practices
+
+Uber | Data Scientist | 2022.06 - 2022.12
+- Built demand forecasting models for ride-hailing marketplace using XGBoost and LSTMs
+- Developed real-time surge pricing optimization algorithm reducing wait times by 12%
+- Created automated anomaly detection system for business metrics using statistical methods
+
+Airbnb | Data Science Intern | 2021.06 - 2021.09
+- Analyzed host behavior patterns using SQL and Python on petabyte-scale data
+- Built churn prediction model achieving 85% recall, informing host retention strategies
+- Presented findings to VP of Data Science and Product leadership
+
+Projects
+------
+NLP Research Paper Implementation | Academic | 2021.09 - 2021.12
+- Reproduced and improved upon state-of-the-art few-shot text classification methods
+- Achieved 3% improvement over baseline using contrastive pre-training
+- Published workshop paper at NAACL 2022
+
+Real-Time Anomaly Detection Dashboard | Personal | github.com/emilychen/anomaly-dash
+- End-to-end streaming anomaly detection system with Streamlit dashboard
+- Kafka + Spark Streaming + Isolation Forest for real-time detection
+- Deployed on AWS with Terraform IaC
+
+Certifications
+------
+- AWS Machine Learning Specialty
+- TensorFlow Developer Certificate
+
+Languages
+------
+- English: Native
+- Mandarin Chinese: Native (Bilingual)
+- Spanish: Intermediate

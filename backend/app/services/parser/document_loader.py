@@ -1,8 +1,12 @@
 """
 Multi-format document loader for resumes.
 Supports PDF, DOCX, TXT, MD files.
+
+CPU-bound parsing methods are offloaded to a thread pool via ``asyncio.to_thread``
+to avoid blocking the FastAPI event loop on large documents.
 """
 
+import asyncio
 import os
 from pathlib import Path
 
@@ -42,7 +46,7 @@ class DocumentLoader:
             raise ValueError(f"Unsupported file format: {ext}")
 
         try:
-            text = loader(file_path)
+            text = await asyncio.to_thread(loader, file_path)
             logger.info("Document loaded", file=file_path, ext=ext, length=len(text))
             return text.strip()
         except Exception as e:
@@ -87,5 +91,5 @@ class DocumentLoader:
     @staticmethod
     def _load_txt(file_path: str) -> str:
         """Extract text from plain text file."""
-        with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+        with open(file_path, encoding="utf-8", errors="replace") as f:
             return f.read()

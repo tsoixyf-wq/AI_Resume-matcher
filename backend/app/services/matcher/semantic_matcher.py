@@ -151,7 +151,7 @@ class SemanticMatcher:
             for req in data.requirements:
                 parts.append(req.description)
             parts.extend(data.responsibilities)
-            for skill in data.skills_required:
-                parts.append(skill.name)
+            for skill_req in data.skills_required:
+                parts.append(skill_req.name)
 
         return " ".join(parts)

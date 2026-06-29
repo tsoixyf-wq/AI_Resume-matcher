@@ -142,6 +142,7 @@ class NERExtractor:
 
     def __init__(self):
         self._spacy_models: dict[str, object] = {}
+        self._gliner: Any = None
 
     def _get_spacy_model(self, lang: str = "zh"):
         """Lazy-load spaCy model for given language. Falls back to zh if en unavailable."""
@@ -182,7 +183,7 @@ class NERExtractor:
         Returns a dict with keys: name, email, phone, urls, schools,
         companies, skills, titles, years_of_experience
         """
-        result = {
+        result: dict[str, Any] = {
             "name": "",
             "email": "",
             "phone": "",
@@ -226,7 +227,7 @@ class NERExtractor:
 
     def _extract_phone(self, text: str) -> str:
         match = self.PHONE_PATTERN.search(text)
-        return match.group(0) if match else ""
+        return match.group(0).strip() if match else ""
 
     def _extract_urls(self, text: str) -> list[str]:
         return list(set(match.group(0) for match in self.URL_PATTERN.finditer(text)))
@@ -299,10 +300,17 @@ class NERExtractor:
                 self._gliner = GLiNERModel.from_pretrained("urchade/gliner_medium-v2.1")
                 logger.info("GLiNER model loaded")
 
-            entities = self._gliner.predict_entities(text, labels=["person", "organization", "location", "date"])
+            entities = self._gliner.predict_entities(
+                text, labels=["person", "organization", "location", "date"]
+            )
             result: dict[str, list] = {}
             for ent in entities:
-                key = {"person": "names", "organization": "companies", "location": "locations", "date": "dates"}.get(ent["label"], ent["label"] + "s")
+                key = {
+                    "person": "names",
+                    "organization": "companies",
+                    "location": "locations",
+                    "date": "dates",
+                }.get(ent["label"], ent["label"] + "s")
                 result.setdefault(key, []).append(ent["text"])
             return result
 

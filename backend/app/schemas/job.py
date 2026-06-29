@@ -5,7 +5,6 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-
 # --- Sub-schemas for parsed JD data ---
 
 class Requirement(BaseModel):
@@ -18,7 +17,10 @@ class Requirement(BaseModel):
 class SkillRequirement(BaseModel):
     name: str = Field(..., description="技能名称")
     level: str | None = Field(default=None, description="要求等级")
-    importance: str = Field(default="required", description="重要程度: required / preferred / nice-to-have")
+    importance: str = Field(
+        default="required",
+        description="重要程度: required / preferred / nice-to-have",
+    )
 
 
 class EducationRequirement(BaseModel):

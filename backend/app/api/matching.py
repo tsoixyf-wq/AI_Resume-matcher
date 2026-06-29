@@ -1,14 +1,16 @@
 """Matching API endpoints — delegates to the LangGraph agent pipeline."""
 
+import json
 import time
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.security import require_api_key
 from app.models.job import JobDescription
 from app.models.match_result import MatchResult
 from app.models.resume import Resume
@@ -35,6 +37,7 @@ router = APIRouter()
 async def match_resume_to_job(
     request: MatchRequest,
     db: AsyncSession = Depends(get_db),
+    _api_key: str = Depends(require_api_key),
 ):
     """Run the full matching pipeline via the LangGraph agent pipeline."""
     start_time = time.time()
@@ -78,7 +81,7 @@ async def match_resume_to_job(
     }
 
     # Run agent pipeline: parse_all (skip) → match → explain
-    result_state = await matching_graph.ainvoke(initial_state)
+    result_state = await matching_graph.ainvoke(initial_state)  # type: ignore[attr-defined]  # compiled langgraph graph supports ainvoke but stubs incomplete
 
     # Handle errors from the pipeline
     if result_state.get("error"):
@@ -88,10 +91,26 @@ async def match_resume_to_job(
     match_result = MatchResult(
         resume_id=request.resume_id,
         job_id=request.job_id,
-        rule_score=result_state.get("rule_result", {}).get("score") if result_state.get("rule_result") else None,
-        tfidf_score=result_state.get("tfidf_result", {}).get("score") if result_state.get("tfidf_result") else None,
-        semantic_score=result_state.get("semantic_result", {}).get("score") if result_state.get("semantic_result") else None,
-        llm_score=result_state.get("llm_result", {}).get("score") if result_state.get("llm_result") else None,
+        rule_score=(
+            result_state.get("rule_result", {}).get("score")
+            if result_state.get("rule_result")
+            else None
+        ),
+        tfidf_score=(
+            result_state.get("tfidf_result", {}).get("score")
+            if result_state.get("tfidf_result")
+            else None
+        ),
+        semantic_score=(
+            result_state.get("semantic_result", {}).get("score")
+            if result_state.get("semantic_result")
+            else None
+        ),
+        llm_score=(
+            result_state.get("llm_result", {}).get("score")
+            if result_state.get("llm_result")
+            else None
+        ),
         overall_score=round(result_state.get("overall_score", 0.0), 1),
         dimension_scores=result_state.get("dimension_scores", DimensionScores()).model_dump(),
         matched_skills=result_state.get("matched_skills", []),
@@ -116,6 +135,7 @@ async def match_resume_to_job(
 async def match_resume_stream(
     request: MatchRequest,
     db: AsyncSession = Depends(get_db),
+    _api_key: str = Depends(require_api_key),
 ):
     """Stream the LLM matching analysis in real time (SSE)."""
     # Load resume and JD
@@ -123,6 +143,8 @@ async def match_resume_stream(
     resume = resume_result.scalar_one_or_none()
     if not resume:
         raise HTTPException(status_code=404, detail="简历不存在")
+    if resume.parse_status != "completed":
+        raise HTTPException(status_code=400, detail="简历尚未解析完成")
 
     jd_result = await db.execute(select(JobDescription).where(JobDescription.id == request.job_id))
     jd = jd_result.scalar_one_or_none()
@@ -137,7 +159,7 @@ async def match_resume_stream(
     async def generate():
         yield "data: {\"status\": \"started\"}\n\n"
         async for token in llm_matcher.match_stream(resume_data, jd_data):
-            yield f"data: {{\"token\": {__import__('json').dumps(token)}}}\n\n"
+            yield f"data: {{\"token\": {json.dumps(token)}}}\n\n"
         yield "data: {\"status\": \"completed\"}\n\n"
 
     return StreamingResponse(
@@ -155,6 +177,7 @@ async def match_resume_stream(
 async def batch_match(
     request: BatchMatchRequest,
     db: AsyncSession = Depends(get_db),
+    _api_key: str = Depends(require_api_key),
 ):
     """Batch match multiple resumes against one job (async via Celery)."""
     # Validate that job exists
@@ -176,7 +199,10 @@ async def batch_match(
         "task_id": task.id,
         "status": "processing",
         "total": len(request.resume_ids),
-        "message": f"批量匹配已提交，共 {len(request.resume_ids)} 份简历。通过 GET /api/v1/tasks/{task.id} 查询进度",
+        "message": (
+            f"批量匹配已提交，共 {len(request.resume_ids)} 份简历。"
+            f"通过 GET /api/v1/tasks/{task.id} 查询进度"
+        ),
     }
 
 
@@ -207,22 +233,29 @@ async def list_match_results(
 ):
     """List match results, optionally filtered by resume or job."""
     query = select(MatchResult).order_by(MatchResult.overall_score.desc())
+    count_query = select(func.count(MatchResult.id))
 
     if resume_id:
         query = query.where(MatchResult.resume_id == resume_id)
+        count_query = count_query.where(MatchResult.resume_id == resume_id)
     if job_id:
         query = query.where(MatchResult.job_id == job_id)
+        count_query = count_query.where(MatchResult.job_id == job_id)
+
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
 
     result = await db.execute(query.limit(50))
     matches = result.scalars().all()
 
-    return {"items": [_build_match_response(m) for m in matches], "total": len(matches)}
+    return {"items": [_build_match_response(m) for m in matches], "total": total}
 
 
 @router.delete("/results/{match_id}")
 async def delete_match_result(
     match_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
+    _api_key: str = Depends(require_api_key),
 ):
     """Delete a match result."""
     result = await db.execute(select(MatchResult).where(MatchResult.id == match_id))

@@ -57,7 +57,6 @@ jobs:
 
       - name: Type check (mypy)
         run: mypy app/ --ignore-missing-imports --exclude 'alembic/'
-        continue-on-error: true  # Non-blocking — tighten over time
 
       - name: Run tests
         env:
@@ -99,7 +98,7 @@ jobs:
 
       - name: Lint
         run: npm run lint
-        continue-on-error: true  # Non-blocking — tighten over time
+        continue-on-error: true  # TODO: remove after ESLint 9 flat-config migration
 
       - name: Build
         run: npm run build

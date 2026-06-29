@@ -15,8 +15,10 @@ settings = get_settings()
 async def lifespan(app: FastAPI):
     """Application startup and shutdown events."""
     # Startup
-    from app.core.database import engine
-    from app.core.database import Base  # noqa: F811
+    from app.core.database import (
+        Base,  # noqa: F811
+        engine,
+    )
 
     if settings.DEBUG:
         # Development: auto-create tables for convenience
@@ -52,8 +54,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "X-API-Key", "Authorization"],
 )
 
 # API Routers

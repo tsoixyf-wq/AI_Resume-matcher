@@ -8,7 +8,9 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.security import require_api_key
 from app.models.job import JobDescription
+from app.models.resume import Resume
 from app.schemas.job import (
     JDCreateRequest,
     JDListResponse,
@@ -25,6 +27,7 @@ router = APIRouter()
 async def create_job(
     request: JDCreateRequest,
     db: AsyncSession = Depends(get_db),
+    _api_key: str = Depends(require_api_key),
 ):
     """Create a new job description and parse it."""
     # Create record
@@ -76,7 +79,11 @@ async def create_job(
         title=jd.title,
         department=jd.department,
         location=jd.location,
-        parsed_data=ParsedJDData(**jd.parsed_data) if jd.parse_status == "completed" else ParsedJDData(),
+        parsed_data=(
+            ParsedJDData(**jd.parsed_data)
+            if jd.parse_status == "completed"
+            else ParsedJDData()
+        ),
         raw_text=jd.raw_text,
         parse_status=jd.parse_status,
         is_active=jd.is_active,
@@ -158,6 +165,7 @@ async def update_job(
     job_id: uuid.UUID,
     request: JDCreateRequest,
     db: AsyncSession = Depends(get_db),
+    _api_key: str = Depends(require_api_key),
 ):
     """Update a job description (partial update)."""
     result = await db.execute(select(JobDescription).where(JobDescription.id == job_id))
@@ -201,7 +209,11 @@ async def update_job(
         title=jd.title,
         department=jd.department,
         location=jd.location,
-        parsed_data=ParsedJDData(**jd.parsed_data) if jd.parse_status == "completed" else ParsedJDData(),
+        parsed_data=(
+            ParsedJDData(**jd.parsed_data)
+            if jd.parse_status == "completed"
+            else ParsedJDData()
+        ),
         raw_text=jd.raw_text,
         parse_status=jd.parse_status,
         is_active=jd.is_active,
@@ -226,10 +238,73 @@ async def toggle_job_active(
     return {"is_active": jd.is_active}
 
 
+@router.get("/{job_id}/similar-resumes")
+async def get_similar_resumes(
+    job_id: uuid.UUID,
+    top_k: int = Query(10, ge=1, le=50),
+    db: AsyncSession = Depends(get_db),
+):
+    """Find resumes most similar to a job description using vector similarity.
+
+    Uses the JD's BGE embedding as query vector against the ChromaDB resume
+    collection. Returns results ranked by cosine similarity (1 - distance).
+    """
+    # Verify JD exists
+    result = await db.execute(select(JobDescription).where(JobDescription.id == job_id))
+    jd = result.scalar_one_or_none()
+    if not jd:
+        raise HTTPException(status_code=404, detail="岗位不存在")
+
+    if not jd.embedding_id:
+        raise HTTPException(
+            status_code=400,
+            detail="该岗位尚未生成向量嵌入，无法进行相似度搜索",
+        )
+
+    try:
+        from app.services.embedding.embedding_service import find_similar_resumes
+
+        similar = await find_similar_resumes(str(job_id), top_k=top_k)
+    except Exception as e:
+        logger.error("Similarity search failed for JD %s: %s", job_id, e)
+        raise HTTPException(status_code=500, detail=f"相似度搜索失败: {e}") from e
+
+    # Enrich results with resume metadata from DB
+    enriched = []
+    for item in similar:
+        resume_id = item.get("id")
+        row = await db.execute(select(Resume).where(Resume.id == resume_id))
+        resume = row.scalar_one_or_none()
+        enriched.append(
+            {
+                "resume_id": str(resume_id),
+                "filename": resume.original_filename if resume else "unknown",
+                "parse_status": resume.parse_status if resume else "unknown",
+                "similarity": round(1.0 - item.get("distance", 0), 4),
+                "skills": (
+                    [
+                        s.get("name", s) if isinstance(s, dict) else s
+                        for s in resume.parsed_data.get("skills", [])[:5]
+                    ]
+                    if resume and resume.parsed_data
+                    else []
+                ),
+            }
+        )
+
+    return {
+        "job_id": str(job_id),
+        "job_title": jd.title,
+        "total": len(enriched),
+        "results": enriched,
+    }
+
+
 @router.delete("/{job_id}")
 async def delete_job(
     job_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
+    _api_key: str = Depends(require_api_key),
 ):
     """Delete a job description."""
     result = await db.execute(select(JobDescription).where(JobDescription.id == job_id))

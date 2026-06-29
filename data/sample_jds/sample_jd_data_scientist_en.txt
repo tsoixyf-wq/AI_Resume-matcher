@@ -1,0 +1,46 @@
+Senior Data Scientist - ML/AI
+
+Department: AI & Data Science
+Location: New York, NY (Remote Friendly)
+Salary Range: $150,000 - $200,000
+
+[About the Role]
+We are seeking a Senior Data Scientist to lead ML initiatives on our AI & Data Science team. You will develop and deploy machine learning models that directly impact our core product, from personalization engines to predictive analytics. Join us in building data-driven products that serve millions of users.
+
+[Responsibilities]
+1. Lead end-to-end ML projects from problem formulation through production deployment
+2. Design, train, and evaluate machine learning models (classification, regression, recommendation systems)
+3. Build and maintain ML pipelines using Python, Spark, and Airflow
+4. Design and analyze A/B tests to measure the impact of ML-driven product changes
+5. Collaborate with engineering teams to integrate models into production services
+6. Develop dashboards and automated reports to monitor model performance and business metrics
+7. Research and prototype novel ML approaches, including LLM-based solutions
+8. Present findings and recommendations to technical and non-technical stakeholders
+
+[Must-Have Requirements]
+- Master's or PhD in Computer Science, Statistics, Mathematics, or related quantitative field
+- 3+ years of industry experience in data science or machine learning engineering
+- Expert-level Python (Pandas, NumPy, Scikit-learn, XGBoost, PyTorch/TensorFlow)
+- Expert-level SQL with experience querying large-scale datasets (BigQuery, Snowflake, Redshift)
+- Strong understanding of machine learning algorithms, statistical methods, and experiment design
+- Experience deploying ML models to production with monitoring and iteration
+- Proficiency with data visualization tools (Tableau, Looker, or Python libraries)
+- Excellent communication skills with ability to explain complex analyses to diverse audiences
+
+[Nice-to-Have]
+- Experience with deep learning frameworks (PyTorch, Transformers, HuggingFace)
+- Knowledge of NLP, LLMs, RAG, or recommendation systems
+- Experience with big data processing (Spark, Hive, Databricks)
+- Familiarity with ML infrastructure (MLflow, Kubeflow, Weights & Biases)
+- Experience with cloud ML services (AWS SageMaker, GCP Vertex AI)
+- Published research papers or conference presentations
+- Experience in e-commerce, fintech, or ad-tech domains
+
+[What We Offer]
+- Competitive compensation with performance bonuses
+- Full medical, dental, and vision coverage
+- 401(k) matching and equity grants
+- Unlimited PTO policy
+- Remote-first culture with quarterly team gatherings
+- Conference and training budget
+- Modern tech stack and tools of your choice

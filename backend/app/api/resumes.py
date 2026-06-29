@@ -3,10 +3,7 @@
 import logging
 import os
 import tempfile
-import time
 import uuid
-
-logger = logging.getLogger(__name__)
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
@@ -14,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.security import require_api_key
 from app.models.resume import Resume
 from app.schemas.resume import (
     ParsedResumeData,
@@ -22,13 +20,10 @@ from app.schemas.resume import (
     ResumeUploadResponse,
 )
 from app.services.parser.document_loader import DocumentLoader
-from app.services.parser.llm_extractor import LLMExtractor
-from app.services.parser.ner_extractor import NERExtractor
-from app.services.parser.resume_classifier import classify_resume
-from app.services.parser.skill_normalizer import SkillNormalizer
 from app.utils.file_utils import generate_file_path, validate_file
 from app.utils.storage import get_storage
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -38,41 +33,11 @@ def _object_name(resume_id: uuid.UUID, original_filename: str) -> str:
     return f"resumes/{resume_id}.{ext}"
 
 
-def _ner_fallback(entities: dict) -> ParsedResumeData:
-    """Build a basic ParsedResumeData from NER entities when LLM is unavailable.
-
-    Covers email, phone, name, and skills — enough for basic matching.
-    Education, work experience, and projects will be empty.
-    """
-    from app.schemas.resume import BasicInfo, Education, Skill, WorkExperience
-
-    skills = [Skill(name=s, category="") for s in entities.get("skills", [])]
-    education = []
-    work = []
-
-    # Extract schools from NER
-    for school in entities.get("schools", []):
-        education.append(Education(school=school))
-    # Extract companies from NER
-    for company in entities.get("companies", []):
-        work.append(WorkExperience(company=company))
-
-    return ParsedResumeData(
-        basic_info=BasicInfo(
-            name=entities.get("name", ""),
-            email=entities.get("email", ""),
-            phone=entities.get("phone", ""),
-        ),
-        education=education,
-        work_experience=work,
-        skills=skills,
-    )
-
-
 @router.post("/upload", response_model=ResumeUploadResponse)
 async def upload_resume(
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
+    _api_key: str = Depends(require_api_key),
 ):
     """Upload and parse a resume file (PDF/DOCX/TXT).
 
@@ -95,7 +60,11 @@ async def upload_resume(
         f.write(content)
 
     # Create DB record
-    ext = file.filename.rsplit(".", 1)[-1].lower() if file.filename and "." in file.filename else "txt"
+    ext = (
+        file.filename.rsplit(".", 1)[-1].lower()
+        if file.filename and "." in file.filename
+        else "txt"
+    )
     resume = Resume(
         original_filename=file.filename or "unknown",
         file_path=file_path,
@@ -108,7 +77,7 @@ async def upload_resume(
     # --- Production: dispatch to Celery ---
     if not settings.DEBUG:
         from app.tasks.matching_tasks import parse_resume_async
-        task = parse_resume_async.delay(str(resume.id))
+        parse_resume_async.delay(str(resume.id))
         return ResumeUploadResponse(
             id=resume.id,
             original_filename=resume.original_filename,
@@ -119,65 +88,25 @@ async def upload_resume(
         )
 
     # --- Dev mode: parse synchronously ---
-    parsed = ParsedResumeData()
-    llm_failed = False
     try:
-        start_time = time.time()
+        from app.services.parser.service import ResumeParserService
 
         # Load document text
         text = await DocumentLoader.load(file_path)
 
-        # Tier 1: NER extraction (regex + spaCy — always works, no external API)
-        ner = NERExtractor()
-        entities = await ner.extract(text)
+        # Parse via shared service (NER → LLM → merge → normalize → classify)
+        service = ResumeParserService()
+        result = await service.parse(text)
+        parsed = result.parsed
 
-        # Tier 2: LLM deep extraction (may fail if API key is invalid)
-        try:
-            llm_extractor = LLMExtractor()
-            parsed = await llm_extractor.extract(text)
-        except Exception as llm_err:
-            logger.warning("LLM extraction failed, falling back to NER-only: %s", llm_err)
-            llm_failed = True
-            # Build ParsedResumeData from NER entities as fallback
-            parsed = _ner_fallback(entities)
-            if resume.parse_error:
-                resume.parse_error += "; " + str(llm_err)[:300]
-            else:
-                resume.parse_error = f"LLM skipped: {str(llm_err)[:300]}"
-
-        # Merge NER results (high-confidence fields take priority over LLM)
-        if entities.get("email") and not parsed.basic_info.email:
-            parsed.basic_info.email = entities["email"]
-        if entities.get("phone") and not parsed.basic_info.phone:
-            parsed.basic_info.phone = entities["phone"]
-        if entities.get("name") and not parsed.basic_info.name:
-            parsed.basic_info.name = entities["name"]
-
-        # Normalize skills (NER + LLM combined)
-        normalizer = SkillNormalizer()
-        normalized = normalizer.normalize_list(
-            entities.get("skills", []) + [s.name for s in parsed.skills]
-        )
-        from app.schemas.resume import Skill
-        seen_skills = set()
-        merged_skills = []
-        for s in normalized:
-            if s["name"].lower() not in seen_skills:
-                seen_skills.add(s["name"].lower())
-                merged_skills.append(Skill(
-                    name=s["name"],
-                    category=s.get("category_display"),
-                ))
-        parsed.skills = merged_skills
-
-        # Classify resume type (campus vs experienced)
-        parsed.resume_type = classify_resume(parsed, text)
+        if result.llm_error:
+            resume.parse_error = f"LLM skipped: {result.llm_error}"
 
         # Update record
         resume.parsed_data = parsed.model_dump()
         resume.raw_text = text
         resume.parse_status = "completed"
-        resume.parse_duration_ms = int((time.time() - start_time) * 1000)
+        resume.parse_duration_ms = result.duration_ms
 
         # --- Upload to MinIO (if configured) ---
         storage = get_storage()
@@ -347,6 +276,7 @@ async def download_resume(
 async def delete_resume(
     resume_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
+    _api_key: str = Depends(require_api_key),
 ):
     """Delete a resume and its file."""
     result = await db.execute(select(Resume).where(Resume.id == resume_id))
@@ -379,8 +309,9 @@ async def delete_resume(
         pass
 
     # Cascade delete match results associated with this resume
-    from app.models.match_result import MatchResult
     from sqlalchemy import delete as sqla_delete
+
+    from app.models.match_result import MatchResult
     await db.execute(sqla_delete(MatchResult).where(MatchResult.resume_id == resume_id))
 
     await db.delete(resume)

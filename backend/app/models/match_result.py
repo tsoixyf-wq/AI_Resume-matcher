@@ -2,12 +2,17 @@
 
 import uuid
 from datetime import datetime
+from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Float, Integer, String, Text, func
+from sqlalchemy import DateTime, Float, ForeignKey, Integer, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.job import JobDescription
+    from app.models.resume import Resume
 
 
 class MatchResult(Base):
@@ -17,11 +22,21 @@ class MatchResult(Base):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     resume_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
+        UUID(as_uuid=True),
+        ForeignKey("resumes.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     job_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
+        UUID(as_uuid=True),
+        ForeignKey("job_descriptions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
+
+    # Relationships
+    resume: Mapped["Resume"] = relationship(back_populates="match_results")
+    job: Mapped["JobDescription"] = relationship(back_populates="match_results")
 
     # Multi-stage scores
     rule_score: Mapped[float | None] = mapped_column(Float, nullable=True)

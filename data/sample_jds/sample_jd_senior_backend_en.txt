@@ -1,0 +1,45 @@
+Senior Backend Engineer
+
+Department: Platform Engineering
+Location: San Francisco, CA (Hybrid)
+Salary Range: $160,000 - $220,000
+
+[About the Role]
+We are looking for a Senior Backend Engineer to join our Platform Engineering team. You will design, build, and scale the core services that power our AI-driven SaaS platform, serving millions of users worldwide. This is a high-impact role where you'll work on distributed systems, API design, and AI integration.
+
+[Responsibilities]
+1. Design and implement scalable, high-availability backend services and APIs
+2. Architect and optimize distributed systems handling 100M+ daily requests
+3. Lead technical design reviews and mentor junior engineers
+4. Build and maintain CI/CD pipelines and infrastructure-as-code
+5. Integrate LLM-powered features into production services (RAG, agents, embeddings)
+6. Establish monitoring, alerting, and on-call practices for service reliability
+7. Collaborate with product and ML teams to ship AI-native features
+
+[Must-Have Requirements]
+- Bachelor's degree or higher in Computer Science or related field
+- 5+ years of professional backend development experience
+- Expert-level Python proficiency with FastAPI, Django, or Flask
+- Strong experience with PostgreSQL, Redis, and message queues (RabbitMQ/Kafka)
+- Deep understanding of distributed systems, microservices, and API design patterns
+- Production experience with Docker and Kubernetes
+- Experience with at least one major cloud provider (AWS/GCP/Azure)
+- Strong system design and problem-solving skills
+
+[Nice-to-Have]
+- Experience with Go or Rust for performance-critical services
+- Familiarity with LLM frameworks (LangChain, LangGraph, LlamaIndex)
+- Knowledge of vector databases (ChromaDB, Pinecone, Milvus)
+- Open-source contributions or technical blog
+- Experience leading engineering teams or large-scale projects
+- Understanding of MLOps and model serving infrastructure
+- Prior experience at a high-growth SaaS startup
+
+[What We Offer]
+- Competitive salary with equity package
+- Comprehensive health, dental, and vision insurance
+- 401(k) with company match
+- Flexible PTO and remote-friendly culture
+- Annual learning & development budget ($5,000)
+- Home office setup stipend
+- Regular team offsites and hackathons

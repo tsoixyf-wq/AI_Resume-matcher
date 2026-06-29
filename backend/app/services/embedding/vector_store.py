@@ -4,7 +4,6 @@ Stores and retrieves resume/JD embeddings for similarity search.
 """
 
 import uuid
-from typing import Optional
 
 import chromadb
 import structlog
@@ -28,7 +27,7 @@ class VectorStore:
         self._port = settings.CHROMA_PORT
 
     @property
-    def client(self) -> chromadb.Client:
+    def client(self) -> chromadb.Client:  # type: ignore[valid-type]  # chromadb stubs incomplete
         """Lazy-init ChromaDB client."""
         if self._client is None:
             try:
@@ -41,16 +40,16 @@ class VectorStore:
             except Exception:
                 logger.warning("ChromaDB HTTP failed, falling back to in-memory")
                 self._client = chromadb.Client(
-                    Settings(anonymized_telemetry=False, is_persistent=False)
+                    ChromaSettings(anonymized_telemetry=False, is_persistent=False)
                 )
         return self._client
 
     def get_collection(self, name: str) -> chromadb.Collection:
         """Get or create a collection."""
         try:
-            return self.client.get_collection(name)
+            return self.client.get_collection(name)  # type: ignore[attr-defined]  # chromadb stubs incomplete
         except Exception:
-            return self.client.create_collection(
+            return self.client.create_collection(  # type: ignore[attr-defined]  # chromadb stubs incomplete
                 name=name,
                 metadata={"hnsw:space": "cosine"},
             )
@@ -71,7 +70,7 @@ class VectorStore:
 
         collection.upsert(
             ids=[doc_id],
-            embeddings=[embedding],
+            embeddings=[embedding],  # type: ignore[arg-type]  # chromadb expects ndarray/Sequence
             metadatas=[metadata or {}],
             documents=[text[:5000]],
         )
@@ -91,7 +90,7 @@ class VectorStore:
 
         collection.upsert(
             ids=[doc_id],
-            embeddings=[embedding],
+            embeddings=[embedding],  # type: ignore[arg-type]  # chromadb expects ndarray/Sequence
             metadatas=[metadata or {}],
             documents=[text[:5000]],
         )
@@ -109,7 +108,7 @@ class VectorStore:
             return []
 
         results = collection.query(
-            query_embeddings=[query_embedding],
+            query_embeddings=[query_embedding],  # type: ignore[arg-type]  # chromadb expects ndarray/Sequence
             n_results=min(n_results, collection.count()),
             include=["metadatas", "documents", "distances"],
         )
@@ -117,8 +116,8 @@ class VectorStore:
         return [
             {
                 "id": results["ids"][0][i],
-                "metadata": results["metadatas"][0][i] if results["metadatas"][0] else {},
-                "distance": results["distances"][0][i],
+                "metadata": results["metadatas"][0][i] if results["metadatas"][0] else {},  # type: ignore[index]  # chromadb query result stubs incomplete
+                "distance": results["distances"][0][i],  # type: ignore[index]  # chromadb query result stubs incomplete
             }
             for i in range(len(results["ids"][0]))
         ]

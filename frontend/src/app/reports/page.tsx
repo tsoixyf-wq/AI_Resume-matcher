@@ -126,7 +126,9 @@ export default function ReportsPage() {
       dataIndex: "overall_score",
       key: "score",
       width: 120,
-      render: (s: number) => <ScoreTag score={s} />,
+      render: (s: number, record: MatchResult) => (
+        <ScoreTag score={s} isHardPass={record.is_hard_pass} />
+      ),
       sorter: (a: MatchResult, b: MatchResult) =>
         a.overall_score - b.overall_score,
     },

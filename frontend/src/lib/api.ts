@@ -14,6 +14,15 @@ const api = axios.create({
   timeout: 120000,
 });
 
+// Inject API Key header for write operations (backend enforces X-API-Key)
+api.interceptors.request.use((config) => {
+  const apiKey = process.env.NEXT_PUBLIC_API_KEY;
+  if (apiKey) {
+    config.headers["X-API-Key"] = apiKey;
+  }
+  return config;
+});
+
 // --- Resumes ---
 
 export async function uploadResume(file: File): Promise<ResumeItem> {

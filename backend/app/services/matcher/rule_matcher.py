@@ -6,6 +6,7 @@ If any hard requirement fails, the candidate is filtered out (hard pass).
 
 import structlog
 
+from app.core.config import get_settings
 from app.schemas.job import ParsedJDData
 from app.schemas.resume import ParsedResumeData
 
@@ -168,7 +169,8 @@ class RuleMatcher:
             if not found:
                 missing.append(skill.name)
 
-        if len(missing) > len(must_skills) * 0.5:  # If more than 50% missing
+        threshold = get_settings().MUST_SKILL_MISSING_THRESHOLD
+        if len(missing) > len(must_skills) * threshold:  # Configurable: default 50%
             return {
                 "passed": False,
                 "reason": f"必备技能缺失过多：缺失 {missing}",

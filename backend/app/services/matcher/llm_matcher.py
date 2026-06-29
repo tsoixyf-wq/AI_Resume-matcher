@@ -3,7 +3,7 @@ Stage 4: LLM-based deep reasoning for resume-job matching.
 Generates human-readable explanations for match/non-match decisions.
 """
 
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import structlog
 
